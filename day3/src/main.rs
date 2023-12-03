@@ -9,6 +9,9 @@ fn main() -> std::io::Result<()> {
     let t1_sum = task1::handle_input(&input);
     println!("Task1 answer: {t1_sum}");
 
+    let t2_sum = task2::handle_input(&input);
+    println!("Task1 answer: {t2_sum}");
+
     Ok(())
 }
 
@@ -16,8 +19,8 @@ mod task1 {
     use regex::Match;
 
     #[derive(Debug, PartialEq)]
-    struct Number {
-        value: u32,
+    pub struct Number {
+        pub value: u32,
         start: usize,
         end: usize,
     }
@@ -53,7 +56,7 @@ mod task1 {
         assert!(!Number::new(114, 4, 8).is_adjacent(&Symbol::new(3)));
     }
 
-    fn find_numbers(line: &str) -> Vec<Number> {
+    pub fn find_numbers(line: &str) -> Vec<Number> {
         let mut results = vec![];
         let re = regex::Regex::new(r"\d+").unwrap();
         for number in re.find_iter(line) {
@@ -86,13 +89,33 @@ mod task1 {
     }
 
     #[derive(Debug, PartialEq)]
-    struct Symbol {
+    pub struct Symbol {
         position: usize,
     }
 
     impl Symbol {
-        fn new(position: usize) -> Self {
+        pub fn new(position: usize) -> Self {
             Self { position }
+        }
+
+        pub fn find_adjacent_numbers(&self, prev: &Line, this: &Line, next: &Line) -> Vec<u32> {
+            let mut results = vec![];
+            for n in &prev.numbers {
+                if n.is_adjacent(self) {
+                    results.push(n.value);
+                }
+            }
+            for n in &this.numbers {
+                if n.is_adjacent(self) {
+                    results.push(n.value);
+                }
+            }
+            for n in &next.numbers {
+                if n.is_adjacent(self) {
+                    results.push(n.value);
+                }
+            }
+            results
         }
     }
 
@@ -123,24 +146,32 @@ mod task1 {
         assert_eq!(find_symbols(".664.598.."), vec![]);
     }
 
-    struct Line {
-        symbols: Vec<Symbol>,
-        numbers: Vec<Number>,
+    pub struct Line {
+        pub symbols: Vec<Symbol>,
+        pub numbers: Vec<Number>,
     }
 
     impl Line {
-        fn empty() -> Self {
+        pub fn empty() -> Self {
             Self {
                 symbols: vec![],
                 numbers: vec![],
             }
         }
 
-        fn new(line: &str) -> Self {
+        pub fn new(line: &str) -> Self {
             Self {
                 symbols: find_symbols(line),
                 numbers: find_numbers(line),
             }
+        }
+
+        fn find_adjacent_numbers(&self, prev: &Line, next: &Line) -> Vec<u32> {
+            let mut results = vec![];
+            for s in &self.symbols {
+                results.append(&mut s.find_adjacent_numbers(prev, self, next));
+            }
+            results
         }
     }
 
@@ -156,51 +187,9 @@ mod task1 {
             this = next;
             next = Line::new(l);
 
-            for s in &this.symbols {
-                for n in &prev.numbers {
-                    if n.is_adjacent(s) {
-                        results.push(n.value);
-                    }
-                }
-
-                for n in &this.numbers {
-                    if n.is_adjacent(s) {
-                        results.push(n.value);
-                    }
-                }
-
-                for n in &next.numbers {
-                    if n.is_adjacent(s) {
-                        results.push(n.value);
-                    }
-                }
-            }
+            results.append(&mut this.find_adjacent_numbers(&prev, &next));
         }
-
-        prev = this;
-        this = next;
-        next = Line::empty();
-
-        for s in &this.symbols {
-            for n in &prev.numbers {
-                if n.is_adjacent(s) {
-                    results.push(n.value);
-                }
-            }
-
-            for n in &this.numbers {
-                if n.is_adjacent(s) {
-                    results.push(n.value);
-                }
-            }
-
-            for n in &next.numbers {
-                if n.is_adjacent(s) {
-                    results.push(n.value);
-                }
-            }
-        }
-
+        results.append(&mut next.find_adjacent_numbers(&this, &Line::empty()));
         results
     }
 
@@ -258,6 +247,114 @@ mod task1 {
 .664.598.."
             ),
             4361
+        );
+    }
+}
+
+mod task2 {
+    use crate::task1::{find_numbers, Line, Symbol};
+
+    fn find_gear_symbols(line: &str) -> Vec<Symbol> {
+        let mut results = vec![];
+        for (i, s) in line.chars().enumerate() {
+            if s == '*' {
+                results.push(Symbol::new(i));
+            }
+        }
+        results
+    }
+
+    #[test]
+    fn test_find_gear_symbols() {
+        assert_eq!(find_gear_symbols("467..114.."), vec![]);
+        assert_eq!(find_gear_symbols("...*......"), vec![Symbol::new(3)]);
+        assert_eq!(find_gear_symbols("..35..633."), vec![]);
+        assert_eq!(find_gear_symbols("......#..."), vec![]);
+        assert_eq!(find_gear_symbols("617*......"), vec![Symbol::new(3)]);
+        assert_eq!(find_gear_symbols(".....+.58."), vec![]);
+        assert_eq!(find_gear_symbols("..592....."), vec![]);
+        assert_eq!(find_gear_symbols("......755."), vec![]);
+        assert_eq!(find_gear_symbols("...$.*...."), vec![Symbol::new(5)]);
+        assert_eq!(find_gear_symbols(".664.598.."), vec![]);
+    }
+
+    impl Line {
+        fn find_gears(&self, prev: &Line, next: &Line) -> Vec<u32> {
+            let mut results = vec![];
+            for s in &self.symbols {
+                let adjacent_numbers = s.find_adjacent_numbers(prev, self, next);
+                if adjacent_numbers.len() == 2 {
+                    results.push(adjacent_numbers[0] * adjacent_numbers[1]);
+                }
+            }
+            results
+        }
+
+        fn new_gears(line: &str) -> Self {
+            Self {
+                symbols: find_gear_symbols(line),
+                numbers: find_numbers(line),
+            }
+        }
+    }
+
+    fn find_gears(input: &str) -> Vec<u32> {
+        let mut results = vec![];
+
+        let mut this = Line::empty();
+        let mut prev = Line::empty();
+        let mut next = Line::empty();
+
+        for l in input.lines() {
+            prev = this;
+            this = next;
+            next = Line::new_gears(l);
+
+            results.append(&mut this.find_gears(&prev, &next));
+        }
+        results.append(&mut next.find_gears(&this, &Line::empty()));
+        results
+    }
+
+    #[test]
+    fn test_find_gears() {
+        assert_eq!(
+            find_gears(
+                "467..114..
+...*......
+..35..633.
+......#...
+617*......
+.....+.58.
+..592.....
+......755.
+...$.*....
+.664.598.."
+            ),
+            vec![16345, 451490]
+        );
+    }
+
+    pub fn handle_input(input: &str) -> u32 {
+        find_gears(input).iter().sum()
+    }
+
+    #[test]
+    fn test_handle_input() {
+        assert_eq!(
+            handle_input(
+                "467..114..
+...*......
+..35..633.
+......#...
+617*......
+.....+.58.
+..592.....
+......755.
+...$.*....
+.664.598.."
+            ),
+            467835
         );
     }
 }
