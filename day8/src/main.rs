@@ -7,7 +7,7 @@ fn main() -> std::io::Result<()> {
     file.read_to_string(&mut input)?;
 
     println!("Task1 answer: {}", task1::handle_input(&input));
-    // println!("Task2 answer: {}", task2::handle_input(&input));
+    println!("Task2 answer: {}", task2::handle_input(&input));
 
     Ok(())
 }
@@ -15,14 +15,14 @@ fn main() -> std::io::Result<()> {
 mod task1 {
     use std::collections::HashMap;
 
-    struct Node {
+    pub struct Node {
         left: String,
         right: String,
     }
 
     impl Node {
         fn from_str(input: &str) -> Self {
-            let re = regex::Regex::new(r"\((?<left>[A-Z]+), (?<right>[A-Z]+)\)").unwrap();
+            let re = regex::Regex::new(r"\((?<left>[A-Z0-9]+), (?<right>[A-Z0-9]+)\)").unwrap();
             let m = re.captures(input).unwrap();
             Self {
                 left: m["left"].trim().to_string(),
@@ -45,7 +45,7 @@ mod task1 {
         assert_eq!(node.right, "CCC");
     }
 
-    fn parse_nodes(input: &str) -> HashMap<String, Node> {
+    pub fn parse_nodes(input: &str) -> HashMap<String, Node> {
         let mut results = HashMap::new();
         for l in input.lines() {
             let (key, value) = l.split_once("=").unwrap();
@@ -54,23 +54,29 @@ mod task1 {
         results
     }
 
-    pub fn handle_input(input: &str) -> u32 {
+    pub fn get_number_of_steps(
+        start: &String,
+        commands: &Vec<Command>,
+        nodes: &HashMap<String, Node>,
+        end_condition: fn(&String) -> bool,
+    ) -> usize {
+        let mut current = &nodes[start];
+        for step in 0.. {
+            let c = &commands[step % commands.len()];
+            let next = current.next(c);
+            if end_condition(next) {
+                return step + 1;
+            }
+            current = &nodes[next];
+        }
+        unreachable!();
+    }
+
+    pub fn handle_input(input: &str) -> usize {
         let (commands, nodes) = input.split_once("\n\n").unwrap();
         let commands = parse_commands(commands);
         let nodes = parse_nodes(nodes);
-
-        let mut result = 0;
-        let mut current = &nodes[&"AAA".to_string()];
-        loop {
-            for c in &commands {
-                let next = current.next(c);
-                result += 1;
-                if next == "ZZZ" {
-                    return result;
-                }
-                current = &nodes[next];
-            }
-        }
+        get_number_of_steps(&"AAA".to_string(), &commands, &nodes, |s| s == "ZZZ")
     }
 
     #[test]
@@ -102,12 +108,12 @@ ZZZ = (ZZZ, ZZZ)"
     }
 
     #[derive(Debug, PartialEq)]
-    enum Command {
+    pub enum Command {
         Left,
         Right,
     }
 
-    fn parse_commands(input: &str) -> Vec<Command> {
+    pub fn parse_commands(input: &str) -> Vec<Command> {
         let mut commands = vec![];
         for c in input.chars() {
             match c {
@@ -125,6 +131,55 @@ ZZZ = (ZZZ, ZZZ)"
         assert_eq!(
             parse_commands("LLR"),
             vec![Command::Left, Command::Left, Command::Right]
+        );
+    }
+}
+
+mod task2 {
+    use crate::task1::{get_number_of_steps, parse_commands, parse_nodes};
+
+    fn gcd(a: usize, b: usize) -> usize {
+        if b == 0 {
+            a
+        } else {
+            gcd(b, a % b)
+        }
+    }
+
+    fn lcm<I>(nums: I) -> usize
+    where
+        I: Iterator<Item = usize>,
+    {
+        nums.fold(1, |num, ans| num * ans / gcd(num, ans))
+    }
+
+    pub fn handle_input(input: &str) -> usize {
+        let (commands, nodes) = input.split_once("\n\n").unwrap();
+        let commands = parse_commands(commands);
+        let nodes = parse_nodes(nodes);
+
+        let starts: Vec<&String> = nodes.keys().filter(|k| k.ends_with('A')).collect();
+        lcm(starts
+            .iter()
+            .map(|s| get_number_of_steps(s, &commands, &nodes, |s| s.ends_with('Z'))))
+    }
+
+    #[test]
+    fn test_handle_input() {
+        assert_eq!(
+            handle_input(
+                "LR
+
+11A = (11B, XXX)
+11B = (XXX, 11Z)
+11Z = (11B, XXX)
+22A = (22B, XXX)
+22B = (22C, 22C)
+22C = (22Z, 22Z)
+22Z = (22B, 22B)
+XXX = (XXX, XXX)"
+            ),
+            6
         );
     }
 }
