@@ -7,7 +7,7 @@ fn main() -> std::io::Result<()> {
     file.read_to_string(&mut input)?;
 
     println!("Task1 answer: {}", task1::handle_input(&input));
-    // println!("Task2 answer: {}", task2::handle_input(&input));
+    println!("Task2 answer: {}", task2::handle_input(&input));
 
     Ok(())
 }
@@ -29,7 +29,7 @@ mod task1 {
         );
     }
 
-    fn parse_sequence(input: &str) -> Vec<i32> {
+    pub fn parse_sequence(input: &str) -> Vec<i32> {
         input
             .split(" ")
             .map(|n| n.parse::<i32>().unwrap())
@@ -66,9 +66,8 @@ mod task1 {
         assert!(!all_zeros(&vec![3, 0, 2, 0, 0, 0]));
     }
 
-    fn extrapolate(input: &str) -> i32 {
-        let start = parse_sequence(input);
-        let mut current = &start;
+    pub fn produce_sequences(start: &Vec<i32>) -> Vec<Vec<i32>> {
+        let mut current = start;
         let mut sequences: Vec<Vec<i32>> = vec![];
         loop {
             let diff = diff_sequence(&current);
@@ -78,8 +77,13 @@ mod task1 {
             sequences.push(diff);
             current = &sequences[sequences.len() - 1];
         }
+        sequences
+    }
+
+    fn extrapolate(input: &str) -> i32 {
+        let start = parse_sequence(input);
         let mut extrapolation = 0;
-        for s in sequences {
+        for s in produce_sequences(&start).iter().rev() {
             extrapolation += s[s.len() - 1];
         }
         extrapolation += start[start.len() - 1];
@@ -91,5 +95,42 @@ mod task1 {
         assert_eq!(extrapolate("0 3 6 9 12 15"), 18);
         assert_eq!(extrapolate("1 3 6 10 15 21"), 28);
         assert_eq!(extrapolate("10 13 16 21 30 45"), 68);
+    }
+}
+
+mod task2 {
+    use crate::task1::{parse_sequence, produce_sequences};
+
+    pub fn handle_input(input: &str) -> i32 {
+        input.lines().map(|l| extrapolate_backwards(l)).sum()
+    }
+
+    #[test]
+    fn test_handle_input() {
+        assert_eq!(
+            handle_input(
+                "0 3 6 9 12 15
+1 3 6 10 15 21
+10 13 16 21 30 45"
+            ),
+            2
+        );
+    }
+
+    fn extrapolate_backwards(input: &str) -> i32 {
+        let start = parse_sequence(input);
+        let mut extrapolation = 0;
+        for s in produce_sequences(&start).iter().rev() {
+            extrapolation = s[0] - extrapolation;
+        }
+        extrapolation = start[0] - extrapolation;
+        extrapolation
+    }
+
+    #[test]
+    fn test_extrapolate_backwards() {
+        assert_eq!(extrapolate_backwards("0 3 6 9 12 15"), -3);
+        assert_eq!(extrapolate_backwards("1 3 6 10 15 21"), 0);
+        assert_eq!(extrapolate_backwards("10 13 16 21 30 45"), 5);
     }
 }
