@@ -7,19 +7,19 @@ fn main() -> std::io::Result<()> {
     file.read_to_string(&mut input)?;
 
     println!("Task1 answer: {}", task1::handle_input(&input));
-    // println!("Task2 answer: {}", task2::handle_input(&input));
+    println!("Task2 answer: {}", task2::handle_input(&input));
 
     Ok(())
 }
 
 mod task1 {
     pub fn handle_input(input: &str) -> usize {
+        count_visited(input, Light::new(0, 0, Direction::Right))
+    }
+
+    pub fn count_visited(input: &str, start: Light) -> usize {
         let mut map = Map::new(input);
-        let mut lights = vec![Light {
-            x: 0,
-            y: 0,
-            direction: Direction::Right,
-        }];
+        let mut lights = vec![start];
         while !lights.is_empty() {
             match lights.pop() {
                 Some(light) => lights.append(&mut map.visit(&light)),
@@ -77,7 +77,7 @@ mod task1 {
                 .get_mut(light.x as usize)
         }
 
-        fn visit(&mut self, light: &Light) -> Vec<Light> {
+        pub fn visit(&mut self, light: &Light) -> Vec<Light> {
             match self.get_mut(light) {
                 Some(point) => {
                     if point.directions.contains(&light.direction) {
@@ -90,7 +90,7 @@ mod task1 {
             }
         }
 
-        fn count_visited(&self) -> usize {
+        pub fn count_visited(&self) -> usize {
             self.points
                 .iter()
                 .map(|l| l.iter().filter(|p| p.visited()).count())
@@ -98,20 +98,21 @@ mod task1 {
         }
     }
 
-    struct Light {
+    #[derive(Clone, Copy)]
+    pub struct Light {
         x: i32,
         y: i32,
         direction: Direction,
     }
 
     impl Light {
-        fn new(x: i32, y: i32, direction: Direction) -> Self {
+        pub fn new(x: i32, y: i32, direction: Direction) -> Self {
             Self { x, y, direction }
         }
     }
 
     #[derive(Debug, PartialEq, Clone, Copy)]
-    enum Direction {
+    pub enum Direction {
         Left,
         Right,
         Up,
@@ -185,5 +186,47 @@ mod task1 {
                 _ => unreachable!(),
             }
         }
+    }
+}
+
+mod task2 {
+    use crate::task1::{count_visited, Direction, Light};
+
+    pub fn handle_input(input: &str) -> usize {
+        let y_len = input.lines().count() as i32;
+        let x_len = input.lines().nth(0).unwrap().chars().count() as i32;
+        let mut starts = vec![];
+        for x in 0..x_len {
+            starts.push(Light::new(x, 0, Direction::Down));
+            starts.push(Light::new(x, y_len - 1, Direction::Up));
+        }
+        for y in 0..y_len {
+            starts.push(Light::new(0, y, Direction::Right));
+            starts.push(Light::new(x_len - 1, y, Direction::Left));
+        }
+        starts
+            .iter()
+            .map(|s| count_visited(input, *s))
+            .max()
+            .unwrap()
+    }
+
+    #[test]
+    fn test_handle_input() {
+        assert_eq!(
+            handle_input(
+                r".|...\....
+|.-.\.....
+.....|-...
+........|.
+..........
+.........\
+..../.\\..
+.-.-/..|..
+.|....-|.\
+..//.|...."
+            ),
+            51
+        );
     }
 }
