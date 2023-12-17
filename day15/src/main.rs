@@ -107,11 +107,11 @@ mod task2 {
         fn handle_command(&mut self, command: &str) {
             if command.ends_with("-") {
                 let label = &command[0..command.len() - 1];
-                let mut b = &mut self.boxes[hash(label) as usize];
+                let b = &mut self.boxes[hash(label) as usize];
                 b.remove_lens(label);
             } else {
                 let (label, focal_length) = command.split_once("=").unwrap();
-                let mut b = &mut self.boxes[hash(label) as usize];
+                let b = &mut self.boxes[hash(label) as usize];
                 b.add_lens(label, focal_length.parse::<usize>().unwrap());
             }
         }
